@@ -1,44 +1,36 @@
+// CAUTION! This contract is just a test contract. If you use this contract on the ETH mainnet, you might loss your precious assets because of security errors or inaccurate codes.
+
 // crypt zombieを基本資料としたので0.4.18にしている。
 pragma solidity ^0.4.18;
 
-// living messageや　withdrawToOwnerはコントラクト生成者（遺言者）のみが行うべきであるため、ownable修飾を用いたかった。
+// living messageや　withdrawToOwnerはコントラクト生成者（遺言者）のみが行うべきであるため、ownable修飾子を用いたかった。
 
 import "./ownable.sol";
  
 contract Will is Ownable {
     
-    // Ownable Contractに定義されているため下記不要。
-    // address public owner; 
+    // Ownable Contractにaddress public ownerが定義されている。
+    // ownerが遺言者、receiverが受遺者である。
     
     address public receiver;
-	uint private amount;
 	uint withdrawableTime;
 	uint cooldownTime = 1 minutes;
 	
-
-	
-// 	下記はreceiverとして、firefoxのmetamskアカウントをconstructorで書き込んだ。
-	constructor() {
+// 	下記はreceiverとして、firefoxのmetamskアカウントをconstructorで書き込んだ。本来であればreceiverを変更できるfunctionを記述すべきであるとも思えるが、セキュリティの向上及び遺言の性質からしてひとまずアドレス変更functionをつけないことにする。
+	constructor() public {
 	    receiver = 0xC960804664D3fAdDcD037240BFD55A2e1F197503;
 	}
 	
 	
-//  Ownableのconstructorに定義されているため下記不要。 
-// 	function Will() public {
-// 	    //ownerにはこのコントラクトを生成したアカウントが設定される
-// 		owner = msg.sender;
-// 	}
-	
 	function deposit() public payable {
 	    //この関数を呼び出したアカウントから指定分のイーサが入る
 	    // このときdeployボタンの上にある　VALUE欄の数字をいじることで送金できるETHの量を変更できることに注意！！！
-	   
 	}
 	
 	function withdrawToOwner() public onlyOwner {
 	    //この関数を呼び出したアカウントにamountが支払われる
 	    // this.balanceは、コントラクトアドレス内のETHの総量を示す。
-	    msg.sender.transfer(this.balance);
+	    msg.sender.transfer(address(this).balance);
 	}
 	
 	
@@ -56,7 +48,13 @@ contract Will is Ownable {
 	
 	function withdrawToReceiver() public onlyReceiver {
 	    require(now > withdrawableTime );
-	    msg.sender.transfer(this.balance);    
+	    msg.sender.transfer(address(this).balance);
+	    
 	}
+	
+	
+	
+	
+	
 	
 }
