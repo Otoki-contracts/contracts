@@ -1,0 +1,54 @@
+erc20トークンをコントラクトアドレスに預け入れ、そのトークンを別のアドレスに送るコードは以下のとおりである。
+外部コントラクトの関数を呼び出して実行することについて苦戦したが、以下のコードによって解決することができたので備忘のために残しておく。
+
+まず、既にブロックチェーン上にある外部コントラクトの中の使いたい関数を確認する。そして、その関数を確認したら、関数の内容は書かずに以下のようにinterfaceとして定義する。
+次に、
+IERC20Transfer erc20Contract = IERC20Transfer(0x3028e1e515d7fcad9d75fcad6242c074c299f10b);
+のように、外部コントラクトを自己のコードの中で定義する。（0x3028e1e515d7fcad9d75fcad6242c074c299f10bはerc20トークンのコントラクトアドレスである。）
+そして、
+function withdrawToOwner(address _to, uint _amount) public onlyOwner {
+        erc20Contract.transfer(_to, _amount);
+    }  
+のように、外部コントラクトの中の実行したい関数を使用する。これによって、外部コントラクト上の関数が実行されることになる。
+
+
+pragma solidity ^0.4.19;
+
+import "./ownable.sol";
+// ERC20を持ってきた。OTOKI TOKENのやつをコピペ
+interface IERC20Transfer {
+    function totalSupply() external view returns (uint);
+    function balanceOf(address tokenOwner) external view returns (uint balance);
+    function allowance(address tokenOwner, address spender) external view returns (uint remaining);
+    function transfer(address to, uint tokens) external returns (bool success);
+    function approve(address spender, uint tokens) external returns (bool success);
+    function transferFrom(address from, address to, uint tokens) external returns (bool success);
+
+    event Transfer(address indexed from, address indexed to, uint tokens);
+    event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
+}
+
+
+contract depositERC20 is Ownable {  
+    // インターフェイスの挿入
+    IERC20Transfer erc20Contract;
+    
+    // やりとりしたいerc20トークンのコントラクトアドレスを代入するための関数
+    function setErc20CollateralTokenContractAddress(address _erc20ContractAddress) public {
+        erc20Contract = IERC20Transfer(_erc20ContractAddress);
+    }
+    
+    
+    //この関数を呼び出したアカウントから指定分のイーサが入る
+	 // このときdeployボタンの上にある　VALUE欄の数字をいじることで送金できるETHの量を変更できることに注意！！！
+    function deposit() public payable {}
+    
+    // 指定したERC20のコントラクトアドレスの中にあるtransfer関数を実行することによって、
+    // このコードのコントラクトアドレスに入り込んだERC20TOKENを引き出せるようにしている。
+    // withdrawToOwner関数実行時に、任意のアドレスを_toに入れることでコントラクトアドレス内のerc20TOKENを_toアドレスに送ることができる。
+    // _amountは小数点第18まで検討する必要がありうる点に注意が必要である。
+    // 実装にあたっては、decimalが１８であることを確認するようなコードを書き込むと良いかもしれない。
+    function withdrawToOwner(address _to, uint _amount) public onlyOwner {
+        erc20Contract.transfer(_to, _amount);
+    }  
+}
