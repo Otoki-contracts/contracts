@@ -1,39 +1,61 @@
+
+
 pragma solidity ^0.4.19;
 
-import "./IERC20.sol";
+interface IERC20 {
+    function totalSupply() external view returns (uint);
+    function balanceOf(address tokenOwner) external view returns (uint balance);
+    function allowance(address tokenOwner, address spender) external view returns (uint remaining);
+    function transfer(address to, uint tokens) external returns (bool success);
+    function approve(address spender, uint tokens) external returns (bool success);
+    function transferFrom(address from, address to, uint tokens) external returns (bool success);
 
-contract Collateral is IERC20 {
+    event Transfer(address indexed from, address indexed to, uint tokens);
+    event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
+}
+
+contract Collateral {
     
-    // 上から順にmetamask4,metamask1のアドレスを挿入した。
-    // debtFulfillmentは債務の履行が完了したことを示すもので、dueDateは弁済期を示す。
+    // 上から順に債権者（＝担保権者）,債務者（＝担保設定者）のアドレスを挿入する。
+    // debtBalanceは総債務額から、債権者アドレスに送金されていない額を引いた額を示す。
+    // repayedBalanceは、債権者アドレスに送金された額を示す。
+    // dueDateは弁済期を示す。
     address public creditor;
     address public debtor;
     uint debtBalance;
     uint repayedBalance;
-    uint debtFulfillment;
     uint dueDate;
     
-    constructor() public {
-        creditor = 0xC960804664D3fAdDcD037240BFD55A2e1F197503;
-        debtor = 0xC12392Ae41E31Ea352acB2E5Fd88B1eFF0325c1f;
-    }
-    
-    // インターフェイスの挿入
+    // インターフェイスの定義
     IERC20 erc20CollateralTokenContract;
     IERC20 erc20LoanTokenContract;
     
-    // やりとりしたいerc20担保トークンのコントラクトアドレスを代入するための関数
-    function setErc20CollateralTokenContractAddress(address _erc20ContractAddress) public {
-        erc20CollateralTokenContract = IERC20(_erc20ContractAddress);
+    // 債務者及び債権者のアドレス並びに貸付トークン及び担保トークンのコントラクトアドレスは固定しておく。
+    // 本来、債務者及び債権者のアドレスhは固定すべきではないとも思えるが、契約の性質上固定する。
+    constructor(address _erc20CollateralTokenAddress, address _erc20LoanTokenAddress) public {
+        creditor = 0xC960804664D3fAdDcD037240BFD55A2e1F197503;
+        debtor = 0xC12392Ae41E31Ea352acB2E5Fd88B1eFF0325c1f;
+        erc20CollateralTokenContract = IERC20(_erc20CollateralTokenAddress);
+        erc20LoanTokenContract = IERC20(_erc20LoanTokenAddress);
     }
     
-    // やりとりしたいerc20貸付金トークン(USDTなど）のコントラクトアドレスを代入するための関数
-    function setErc20LoanTokenContractAddress(address _erc20ContractAddress) public {
-        erc20LoanTokenContract = IERC20(_erc20ContractAddress);
+    // debtBalanceを確認するための関数
+    function getDebtBalance() public view returns (uint) {
+        return debtBalance;
+    }
+
+    // repayedBalanceを確認するための関数
+    function getRepayedBalance() public view returns (uint) {
+        return repayedBalance;
+    }
+    
+    // dueDateを確認するための関数
+    function getDueDate() public view returns (uint) {
+        return dueDate;
     }
     
     // 債務の額を設定する関数。債務の額を増やすのであれば、債務者が自由に債務の額を設定できるようになっている。
-    // 債務の額を減少する方向で事後的に合意したのであれば、コードを再デプロイするべし。
+    // 債務の額を減少する方向で事後的に合意したのであれば、changeDebtBalance関数を実行すればよい。
     function setAndChangeDebtBalance(uint _debtBalance) public {
         require(msg.sender == debtor);
         require(debtBalance <= _debtBalance);
@@ -41,29 +63,42 @@ contract Collateral is IERC20 {
     }
     
     // 債務の額を変更する関数。債務の額を減らすのであれば、債務者が自由に債務の額を設定できるようになっている。
-    // 債務の額を減少する方向で事後的に合意したのであれば、コードを再デプロイするべし。
-    function ChangeDebtBalance(uint _debtBalance) public {
+    // 債務の額を減少する方向で事後的に合意したのであれば、setAndChangeDebtBalance関数を実行すればよい。
+    function changeDebtBalance(uint _debtBalance) public {
         require(msg.sender == creditor);
         require(debtBalance > _debtBalance);
         debtBalance = _debtBalance;
     }
     
     // 債務者がコントラクトアドレスに供与した返済金を債務者自身が引き出すための関数
-    function returnLoanTokenToDebtor(address _to, uint _amount) public {
+    function returnLoanTokenForDebtor(address _to, uint _amount) public {
 	    //この関数を呼び出したアカウントに返済金が移される。
 	   // 担保設定者のみ実行可能
 	   // 債務の履行後にのみ実行可能
+	   // decimalsが18でないerc20トークンは使わないように！！
+	   // _amount * 10e17をしないと、小数点第１８位から入力が始まってしまう。
+	   // 256桁もの発行量を持つerc20トークンは考えにくいので、乗法計算にsafeMathは使っていない。
 	    require(msg.sender == debtor);
+	    _amount = _amount * 10e17;
 	    erc20LoanTokenContract.transfer(_to, _amount);
 	}
 	
+    // returnLoanTokenForCreditor関数においてオーバーフローを防ぐためのsafeMath関数。
+    // 本来ならlibraryから使った方が良い。
+	function safeSub(uint a, uint b) internal pure returns (uint c) {
+        require(b <= a);
+        c = a - b;
+        return c;
+	} 
+	
 	// 債権者がコントラクトアドレスに供与した返済金を引き出すための関数
-    function returnLoanTokenToCreditor(address _to, uint _amount) public {
+    function returnLoanTokenForCreditor(address _to, uint _amount) public {
 	    //この関数を呼び出したアカウントに返済金が移される。
 	   // 担保設定者のみ実行可能
 	   // 債務の履行後にのみ実行可能
 	    require(msg.sender == creditor);
-	    debtBalance -= _amount;
+	    debtBalance = safeSub(debtBalance, _amount);
+	    _amount = _amount * 10e17;
 	    erc20LoanTokenContract.transfer(_to, _amount);
 	}
     
@@ -76,13 +111,15 @@ contract Collateral is IERC20 {
     // 仮に債権者がこのコードのコントラクトアドレス内から返済金を引き出さなくても、
     // このコントラクトアドレス内に送られた返済額が、残債務（debtBalance)を上回るのであれば、担保を引き出せるようにしている。
     // _toには担保トークンの送り先、_erc20thisContractAddressにはこのコードのコントラクトアドレス、_amountには送る担保トークンの数量を代入する。
-	function returnCollateralToDebtor(address _to, address _erc20thisContractAddress,  uint _amount) public {
+    // thisは、このコントラクトのコントラクトアドレスを示す。
+	function returnCollateralForDebtor(address _to, uint _amount) public {
 	    //この関数を呼び出したアカウントに担保が移される。
 	    // this.balanceは、コントラクトアドレス内のETHの総量を示す。
 	   // 担保設定者のみ実行可能
 	   // 債務の履行後にのみ実行可能
 	    require(msg.sender == debtor);
-	    require(debtBalance < 1 || debtBalance <= erc20LoanTokenContract.balanceOf(_erc20thisContractAddress) );
+	    _amount = _amount * 10e17;
+	    require(debtBalance <= erc20LoanTokenContract.balanceOf(this) );
 	    erc20CollateralTokenContract.transfer(_to, _amount);
 	}
     
@@ -108,8 +145,9 @@ contract Collateral is IERC20 {
 	function moveCollateralToCreditor(address _to, uint _amount) public {
 	    require(msg.sender == creditor);
 	    require(now > dueDate);
+	    require(debtBalance > erc20LoanTokenContract.balanceOf(this));
+	    _amount = _amount * 10e17;
 	    erc20CollateralTokenContract.transfer(_to, _amount);
 	}
-	
 	
 }
