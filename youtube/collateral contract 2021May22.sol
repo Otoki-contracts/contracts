@@ -1,5 +1,6 @@
 
 
+
 pragma solidity ^0.4.19;
 
 // このコードはerc20トークンのためのコードではないが、erc20トークンのやり取りのためにerc20のinterfaceが必要になるためIERC20を引用している。
@@ -76,11 +77,20 @@ contract Collateral {
     IERC20 erc20LoanTokenContract;
     
     // 債務者及び債権者のアドレス並びに貸付トークン及び担保トークンのコントラクトアドレスは以下のとおり、契約の性質上固定しておく。
-    constructor(address _erc20CollateralTokenAddress, address _erc20LoanTokenAddress) public {
-        creditor = 0xC960804664D3fAdDcD037240BFD55A2e1F197503;
-        debtor = 0xC12392Ae41E31Ea352acB2E5Fd88B1eFF0325c1f;
+    constructor(
+        address _creditor, 
+        address _debtor, 
+        address _erc20CollateralTokenAddress, 
+        address _erc20LoanTokenAddress,
+        uint _debtBalance,
+        uint _setDueDate
+        ) public {
+        creditor = _creditor;
+        debtor = _debtor;
         erc20CollateralTokenContract = IERC20(_erc20CollateralTokenAddress);
         erc20LoanTokenContract = IERC20(_erc20LoanTokenAddress);
+        debtBalance = _debtBalance;
+        dueDate = now + _setDueDate;
     }
     
     // debtBalanceを確認するための関数
@@ -96,7 +106,7 @@ contract Collateral {
     // 債務の額を設定する関数。債務の額を増やすのであれば、債務者が自由に債務の額を設定できるようになっている。
     // 債務の額を減少する方向で事後的に合意したのであれば、changeDebtBalance関数を実行すればよい。
     // msg.senderは関数を実行しようとしたアドレスである。
-    function setAndChangeDebtBalance(uint _debtBalance) public {
+    function ChangeDebtBalanceByD(uint _debtBalance) public {
         require(msg.sender == debtor);
         require(debtBalance <= _debtBalance);
         debtBalance = _debtBalance;
@@ -104,7 +114,7 @@ contract Collateral {
     
     // 債務の額を変更する関数。債務の額を減らすのであれば、債務者が自由に債務の額を設定できるようになっている。
     // 債務の額を上昇させる方向で事後的に合意したのであれば、setAndChangeDebtBalance関数を実行すればよい。
-    function changeDebtBalance(uint _debtBalance) public {
+    function changeDebtBalanceByC(uint _debtBalance) public {
         require(msg.sender == creditor);
         require(debtBalance > _debtBalance);
         debtBalance = _debtBalance;
@@ -117,7 +127,7 @@ contract Collateral {
     // _amount * 10e17をしないと、小数点第１８位から入力が始まってしまうため、このように記述している。
 	// もっとも、この関数は対象のerc20トークンのdecimalsが18であることを前提にしているため注意を要する。
     // オーバーフロー防止のためSafeMath関数を使用している。
-    function returnLoanTokenForDebtor(address _to, uint _amount) public {
+    function returnLoanTokenByD(address _to, uint _amount) public {
 	    require(msg.sender == debtor);
 	    _amount = _amount.mul(10e17);
 	    erc20LoanTokenContract.transfer(_to, _amount);
@@ -126,7 +136,7 @@ contract Collateral {
 	
 	// 債権者がコントラクトアドレスに供与した返済金を引き出すための関数
     // 債権者が返済金を引き出した場合、残債務額を示すdebtBalanceが引き出した額だけ減少するようになっている。
-    function returnLoanTokenForCreditor(address _to, uint _amount) public {
+    function returnLoanTokenByC(address _to, uint _amount) public {
 	    require(msg.sender == creditor);
 	    debtBalance = debtBalance.sub(_amount);
 	    _amount = _amount.mul(10e17);
@@ -136,7 +146,7 @@ contract Collateral {
     // 債務者が債務の弁済後に、供与した担保を取り戻すための関数
     // debtBalanceよりも多くのLoanTokengがこのコントラクトアドレスに送られていれば実行可能である。
     // thisは、このコントラクトのコントラクトアドレスを示す。
-	function returnCollateralForDebtor(address _to, uint _amount) public {
+	function returnCollateralByD(address _to, uint _amount) public {
 	    require(msg.sender == debtor);
 	    _amount = _amount.mul(10e17);
 	    require(debtBalance <= erc20LoanTokenContract.balanceOf(this) );
@@ -147,7 +157,7 @@ contract Collateral {
     // 既に設定された弁済期よりも長い弁済期しか設定できないため、設定者が債権者のみでも債務者保護に資する。
     // _setDueDateは秒数で入力すること
     // nowはある時点から関数を実行した現在までに経過した秒数である。
-    function setDueDate(uint _setDueDate) public {
+    function setDueDateByC(uint _setDueDate) public {
         require(msg.sender == creditor);
         require(dueDate < now + _setDueDate);
         dueDate = now + _setDueDate;
@@ -156,7 +166,7 @@ contract Collateral {
 	
     // 弁済期経過後に債権者が担保を実行して自己の下に担保トークンを移すための関数
     // debtBalanceがコントラクトアドレスに送られたLoanTokenの額に満たないことが条件である。
-	function executeCollateralForCreditor(address _to, uint _amount) public {
+	function executeCollateralByC(address _to, uint _amount) public {
 	    require(msg.sender == creditor);
 	    require(now > dueDate);
 	    require(debtBalance > erc20LoanTokenContract.balanceOf(this));
