@@ -152,13 +152,23 @@ contract Collateral {
 	    erc20CollateralTokenContract.transfer(_to, _amount);
 	}
     
-    // 弁済期を設定するための関数
+    // 弁済期を再設定するための関数
     // 既に設定された弁済期よりも長い弁済期しか設定できないため、設定者が債権者のみでも債務者保護に資する。
     // _setDueDateは秒数で入力すること
     // nowはある時点から関数を実行した現在までに経過した秒数である。
     function setDueDateByC(uint _setDueDate) public {
         require(msg.sender == creditor);
         require(dueDate < now + _setDueDate);
+        dueDate = now + _setDueDate;
+    }
+    
+    // 弁済期を設定するための関数
+    // 既に設定された弁済期よりも短い弁済期しか設定できないため、設定者が債務者のみでも債権者を害するわけではない。
+    // _setDueDateは秒数で入力すること
+    // nowはある時点から関数を実行した現在までに経過した秒数である。
+    function setDueDateByD(uint _setDueDate) public {
+        require(msg.sender == debtor);
+        require(dueDate > now + _setDueDate);
         dueDate = now + _setDueDate;
     }
 
