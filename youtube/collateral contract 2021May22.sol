@@ -122,19 +122,26 @@ contract Collateral {
     // 債務者がコントラクトアドレスに供与した返済金を債務者自身が引き出すための関数
     // 指定したERC20のコントラクトアドレスの中にあるtransfer関数を実行することによって、
     // このコードのコントラクトアドレスに預けられたERC20TOKENを引き出せるようにしている。
-    // この関数実行時に、任意のアドレスを_toに入れることでコントラクトアドレス内のerc20TOKENを_amount分だけ_toアドレスに送ることができる。
-    // _amount * 10e17をしないと、小数点第１８位から入力が始まってしまうため、このように記述している。
-	// もっとも、この関数は対象のerc20トークンのdecimalsが18であることを前提にしているため注意を要する。
-    // オーバーフロー防止のためSafeMath関数を使用している。
-    function returnLoanTokenByD(address _to, uint _amount) public {
-	    require(msg.sender == debtor);
-	    _amount = _amount.mul(10e17);
-	    erc20LoanTokenContract.transfer(_to, _amount);
-	}
+
+//  債務者がloantokenを引き出すための関数が実装されていたが、
+//  債務者が担保を引き出した後にこの関数の実行を制限する機能を実装するのがやや面倒であること、
+//  債務者がloantokenを引き出すこと自体が消費貸借契約の考え方と整合しにくいこと、
+//  債務者が送り間違えたloantokenは債権者が引き出し可能であり、危機時期以外の円満な債権者債務者関係であれば、債務者の送り間違えによって特段のトラブルは生じにくいこと
+//  そもそも債務者はloantokenを送り間違えるべきではないこと
+//  などを考慮した結果この関数は削除する。
+//     function returnLoanTokenByD(address _to, uint _amount) public {
+// 	    require(msg.sender == debtor);
+// 	    _amount = _amount.mul(10e17);
+// 	    erc20LoanTokenContract.transfer(_to, _amount);
+// 	}
 	
 	
 	// 債権者がコントラクトアドレスに供与した返済金を引き出すための関数
     // 債権者が返済金を引き出した場合、残債務額を示すdebtBalanceが引き出した額だけ減少するようになっている。
+    // この関数実行時に、任意のアドレスを_toに入れることでコントラクトアドレス内のerc20TOKENを_amount分だけ_toアドレスに送ることができる。
+    // _amount * 10e17をしないと、小数点第１８位から入力が始まってしまうため、このように記述している。
+	// もっとも、この関数は対象のerc20トークンのdecimalsが18であることを前提にしているため注意を要する。
+    // オーバーフロー防止のためSafeMath関数を使用している。
     function returnLoanTokenByC(address _to, uint _amount) public {
 	    require(msg.sender == creditor);
 	    debtBalance = debtBalance.sub(_amount);
@@ -171,6 +178,7 @@ contract Collateral {
         require(dueDate > now + _setDueDate);
         dueDate = now + _setDueDate;
     }
+
 
 	
     // 弁済期経過後に債権者が担保を実行して自己の下に担保トークンを移すための関数
