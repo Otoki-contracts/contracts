@@ -7,10 +7,10 @@ import {ERC721} from "@OpenZeppelin/openzeppelin-contracts/contracts/token/ERC72
 import {IERC20} from "@OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 
-contract EmbedingNFT is ERC721 {
+contract EmbeddingNFT is ERC721 {
     
     // @dev See {ERC721}.
-    constructor() ERC721("EmbededNFT", "ENFT") {}
+    constructor() ERC721("EmbeddingNFT", "ENFT") {}
     
     // Initialized tokenId.
     uint256 public nextTokenId = 0;
