@@ -1,6 +1,5 @@
 pragma solidity ^0.4.19;
 
-// このコードはerc20トークンのためのコードではないが、erc20トークンのやり取りのためにerc20のinterfaceが必要になるためIERC20を引用している。
 interface IERC20 {
     function totalSupply() external view returns (uint);
     function balanceOf(address tokenOwner) external view returns (uint balance);
